@@ -1,0 +1,72 @@
+import serial  # Import the serial module for communication with the microcontroller
+import time  # Import time module for potential timing functionality
+import speech_recognition as sr  # Import speech recognition library for voice input
+import pyttsx3  # For text-to-speech feedback
+
+# Initialize Serial Communication
+pico = serial.Serial('COM4', 115200, timeout=1)  # Open a serial connection on port 'COM4' with baud rate 115200. Adjust COM port as needed.
+
+# Initialize Text-to-Speech Engine
+engine = pyttsx3.init()  # Initialize the text-to-speech engine
+engine.setProperty('rate', 150)  # Set speech rate (speed of text-to-speech output)
+
+def speak(text):
+    """Speak a given text using text-to-speech."""
+    engine.say(text)  # Queue the text to be spoken
+    engine.runAndWait()  # Process the queued speech commands and output audio
+
+def recognize_speech():
+    """Use speech recognition to capture and process voice commands."""
+    recognizer = sr.Recognizer()  # Create a speech recognizer instance
+    recognizer.energy_threshold = 1000  # Set the energy threshold for detecting speech
+    recognizer.dynamic_energy_threshold = True  # Enable dynamic adjustment of the energy threshold
+    with sr.Microphone() as source:  # Use the microphone as the audio input source
+        speak("Say the servo angle between 0 and 180.")  # Prompt the user to speak an angle
+        print("Listening for your command...")  # Inform the user that the program is listening
+        try:
+            audio = recognizer.listen(source, timeout=5)  # Listen for voice input, with a 5-second timeout
+            command = recognizer.recognize_google(audio)  # Recognize speech using Google Speech Recognition
+            print(f"You said: {command}")  # Print the recognized speech
+            return command  # Return the recognized command
+        except sr.UnknownValueError:  # Handle cases where speech was not understood
+            print("Sorry, I didn't understand that.")  # Notify the user
+            speak("Sorry, I didn't understand that.")  # Provide verbal feedback
+            return None
+        except sr.RequestError as e:  # Handle errors with the speech recognition service
+            print(f"Could not request results; {e}")  # Print the error details
+            speak("Speech service is unavailable.")  # Notify the user verbally
+            return None
+
+def send_servo_angle(angle):
+    """Send the servo angle to the Pico."""
+    if 0 <= angle <= 180:  # Validate that the angle is within the acceptable range
+        pico.write((str(angle) + '\n').encode())  # Send the angle as a string to the Pico
+        print(f"Sent angle: {angle}")  # Confirm the sent angle in the console
+        speak(f"Servo moved to {angle} degrees.")  # Provide verbal feedback
+    else:  # Handle invalid angles
+        print("Invalid angle. Please provide a number between 0 and 180.")  # Notify the user in the console
+        speak("Invalid angle. Please provide a number between 0 and 180.")  # Provide verbal feedback
+
+# Main Loop
+try:
+    while True:  # Start an infinite loop to continuously listen for voice commands
+        command = recognize_speech()  # Call the function to capture voice input
+        if command is not None:  # Check if a valid command was captured
+            if command.lower() in ["exit", "quit", "stop"]:  # Check if the command is to exit
+                speak("Exiting. Goodbye!")  # Provide verbal feedback
+                print("Exiting...")  # Confirm exit in the console
+                break  # Exit the loop
+            elif command.isdigit():  # Check if the command is a numeric string
+                angle = int(command)  # Convert the string to an integer
+                send_servo_angle(angle)  # Call the function to send the angle to the servo
+            else:  # Handle invalid commands
+                print("Invalid command. Please say a number between 0 and 180.")  # Notify the user in the console
+                speak("Invalid command. Please say a number between 0 and 180.")  # Provide verbal feedback
+except KeyboardInterrupt:  # Handle manual interruption (Ctrl+C)
+    print("Program interrupted. Exiting...")  # Notify the user in the console
+    speak("Program interrupted. Goodbye!")  # Provide verbal feedback
+finally:
+    pico.close()  # Close the serial connection when the program ends
+
+
+This Python script integrates speech recognition, text-to-speech, and serial communication to control a servo motor connected to a Raspberry Pi Pico. The program uses the serial module to establish a connection with the Pico via a specified COM port, enabling the transmission of servo angle commands. Text-to-speech feedback is implemented using the pyttsx3 library to provide verbal prompts and confirmations to the user, while the speech_recognition library captures and processes voice commands. The script listens for a user to say an angle between 0 and 180 degrees, validates the input, and sends it to the Pico over the serial connection. Invalid commands or errors in recognition trigger appropriate feedback. The main loop continuously listens for commands until the user says a termination word like "exit," ensuring seamless interaction. This demonstration highlights the integration of hardware control, voice-based interfaces, and real-time feedback for an interactive user experience.
